@@ -5,15 +5,17 @@ $show_complete_tasks = rand(0, 1);
 // устанавливаем часовой пояс в Московское время
 date_default_timezone_set('Europe/Moscow');
 
+define('secondscInDay', 86400);
+
 $days = rand(-3, 3);
 $task_deadline_ts = strtotime("+" . $days . " day midnight"); // метка времени даты выполнения задачи
 $current_ts = strtotime('now midnight'); // текущая метка времени
 
 // запишите сюда дату выполнения задачи в формате дд.мм.гггг
-$date_deadline = null;
+$date_deadline = date('d.m.Y.', $task_deadline_ts);
 
 // в эту переменную запишите кол-во дней до даты задачи
-$days_until_deadline = null;
+$days_until_deadline = ($task_deadline_ts - $current_ts) / secondscInDay;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -153,6 +155,7 @@ $days_until_deadline = null;
 
                         <td class="task__date">
                             <!--выведите здесь дату выполнения задачи-->
+
                         </td>
 
                         <td class="task__controls">
