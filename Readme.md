@@ -1,7 +1,7 @@
 # Личный проект «Дела в Порядке» 
 
 * Студент: [Ruslan Muradov](https://up.htmlacademy.ru/php/2/user/422621).
-* Наставник: [Jesus](http://www.freeiconspng.com/uploads/jesus-png-28.png).
+* Наставник: [Jesus!](http://www.freeiconspng.com/uploads/jesus-png-28.png).
 
 ---
 
