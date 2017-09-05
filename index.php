@@ -145,7 +145,7 @@ $days_until_deadline = ($task_deadline_ts - $current_ts) / secondscInDay;
                         </td>
                     </tr>
 
-                    <tr class="tasks__item task">
+                    <tr class="tasks__item task task--important">
                         <td class="task__select">
                             <label class="checkbox task__checkbox">
                                 <input class="checkbox__input visually-hidden" type="checkbox">
@@ -153,8 +153,8 @@ $days_until_deadline = ($task_deadline_ts - $current_ts) / secondscInDay;
                             </label>
                         </td>
 
-                        <td class="task__date">
-                            <!--выведите здесь дату выполнения задачи-->
+                        <td class="task__date ">
+                            <?= $date_deadline; ?>
 
                         </td>
 
