@@ -55,7 +55,7 @@ require_once('functions.php');
 require_once('userdata.php');
 $content_data = [
     'tasks' => [],
-    'show_complete_tasks' => true
+    'show_complete_tasks' => false
 ];
 $new_task_data = [
     'errors' => [],
@@ -137,7 +137,13 @@ if (isset($_SESSION['user'])) {
     } else {
         http_response_code(404);
     }
-    $content_data['show_complete_tasks'] = $_GET['show_completed'] ?? $show_complete_tasks;
+    if (isset($_GET['show_completed'])) {
+        setcookie('show_completed', $_GET['show_completed'], strtotime('+3 days'), '/');
+        header("Location: /index.php");
+    }
+    if (isset($_COOKIE['show_completed']) && ($_COOKIE['show_completed'] == 1)) {
+        $content_data['show_complete_tasks'] = true;
+    }
     $layout_data['user'] = $_SESSION['user'];
     $layout_data['projects'] = $projects;
     $layout_data['active_project'] = $project;
