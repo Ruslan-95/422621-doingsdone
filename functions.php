@@ -1,5 +1,5 @@
 <?php
-function render_template($template, $data) {
+function render_template($template, $data = []) {
     $result = '';
     if (file_exists($template)) {
         ob_start();
@@ -8,28 +8,28 @@ function render_template($template, $data) {
     }
     return $result;
 }
-function get_count_tasks($task_list, $project_name) {
-    $all_projects = 'Все';
+function get_count_tasks($task_list, $project_id) {
+    $all_projects = 0;
     $result = 0;
-    if (strtolower($project_name) == strtolower($all_projects)) {
+    if ($project_id == $all_projects) {
         $result = count($task_list);
     } else {
         foreach ($task_list as $key => $value) {
-            if (strtolower($value['category']) == strtolower($project_name)) {
+            if ($value['project_id'] == $project_id) {
                 $result++;
             }
         }
     }
     return $result;
 }
-function filter_tasks($task_list, $project_name) {
-    $all_projects = 'Все';
+function filter_tasks($task_list, $project_id) {
+    $all_projects = 0;
     $result = [];
-    if (strtolower($project_name) == strtolower($all_projects)) {
+    if ($project_id == $all_projects) {
         $result = $task_list;
     } else {
         foreach ($task_list as $key => $value) {
-            if (strtolower($value['category']) == strtolower($project_name)) {
+            if ($value['project_id'] == $project_id) {
                 array_push($result, $value);
             }
         }
@@ -40,20 +40,10 @@ function validate_project($value) {
     return ($value != 0);
 }
 function validate_date($value) {
-    return (strtotime($value) && ($value == date("d.m.Y", strtotime($value))));
+    return (strtotime($value) && (strtotime($value) >= strtotime(date('d.m.Y'))) && ($value == date('d.m.Y', strtotime($value))) );
 }
 function validate_email($value) {
     return filter_var($value, FILTER_VALIDATE_EMAIL);
-}
-function search_user_by_email ($email, $users) {
-    $result = null;
-    foreach ($users as $user) {
-        if ($user['email'] == $email) {
-            $result = $user;
-            break;
-        }
-    }
-    return $result;
 }
 function select_data($connect, $sql, $data = []) {
     $result = [];
