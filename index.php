@@ -39,17 +39,31 @@ $tasks = [
     ],
     [
         'title' => 'Купить корм для кота',
-        'date' => 'Нет',
+        'date' => false,
         'category' => 'Домашние дела',
         'completed' => false
     ],
     [
         'title' => 'Заказать пиццу',
-        'date' => 'Нет',
+        'date' => false,
         'category' => 'Домашние дела',
         'completed' => false
     ]
 ];
+function get_count_tasks($task_list, $project_name) {
+    $all_projects = 'Все';
+    $result = 0;
+    if (strtolower($project_name) == strtolower($all_projects)) {
+        $result = count($task_list);
+    } else {
+        foreach ($task_list as $key => $value) {
+            if (strtolower($value['category']) == strtolower($project_name)) {
+                $result++;
+            }
+        }
+    }
+    return $result;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -94,10 +108,10 @@ $tasks = [
 
                 <nav class="main-navigation">
                     <ul class="main-navigation__list">
-                        <?php foreach ($projects as $key => $value):?>
-                            <li class="main-navigation__list-item <?=($key == 0) ? 'main-navigation__list-item--active': '';?>">
-                                <a class="main-navigation__list-item-link" href="#"><?=$value;?></a>
-                                <span class="main-navigation__list-item-count">0</span>
+                        <?php foreach ($projects as $key => $value): ?>
+                            <li class="main-navigation__list-item <?= ($key == 0) ? 'main-navigation__list-item--active': ''; ?>">
+                                <a class="main-navigation__list-item-link" href="#"><?=$value; ?></a>
+                                <span class="main-navigation__list-item-count"><?= get_count_tasks($tasks, $value); ?></span>
                             </li>
                         <?php endforeach; ?>
                     </ul>
@@ -147,7 +161,7 @@ $tasks = [
 
                 <table class="tasks">
                     <?php foreach ($tasks as $key => $value): ?>
-                        <?php if (!$value['completed'] or ($value['completed'] and $show_complete_tasks == 1)): ?>
+                        <?php if (!$value['completed'] || $show_complete_tasks == 1): ?>
                             <tr class="tasks__item task <?= ($value['completed']) ? 'task--completed' : '';?>">
                                 <td class="task__select">
                                     <label class="checkbox task__checkbox">
@@ -157,7 +171,7 @@ $tasks = [
                                 </td>
 
                                 <td class="task__date">
-                                    <?=$value['date']; ?>
+                                    <?= ($value['date']) ? $value['date'] : 'Нет'; ?>
                                 </td>
 
                                 <td class="task__controls">
