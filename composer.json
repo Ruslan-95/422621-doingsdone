@@ -1,6 +1,14 @@
 {
-    "name": "doingsdone",
+    "name": "htmlacademy/doingsdone",
     "description": "Личный проект «Дела в Порядке» от HTML Academy",
     "type": "project",
-    "require": {}
+    "require": {
+        "swiftmailer/swiftmailer": "@stable"
+    },
+    "authors": [
+        {
+            "name": "mrr",
+            "email": "mrr@technopark.ru"
+        }
+    ]
 }

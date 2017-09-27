@@ -1,283 +1,269 @@
 <?php
-// показывать или нет выполненные задачи
-$show_complete_tasks = rand(0, 1);
+error_reporting(E_ALL);
+session_start();
 
 // устанавливаем часовой пояс в Московское время
 date_default_timezone_set('Europe/Moscow');
 
-$days = rand(-3, 3);
-$task_deadline_ts = strtotime("+" . $days . " day midnight"); // метка времени даты выполнения задачи
-$current_ts = strtotime('now midnight'); // текущая метка времени
+require_once 'vendor/autoload.php';
+require_once 'functions.php';
+require_once 'mysql_helper.php';
+require_once 'init.php';
 
-// запишите сюда дату выполнения задачи в формате дд.мм.гггг
-$date_deadline = null;
+$content_data = [
+    'search' => '',
+    'active_project' => 0,
+    'deadline' => false,
+    'show_complete_tasks' => false,
+    'tasks' => []
+];
 
-// в эту переменную запишите кол-во дней до даты задачи
-$days_until_deadline = null;
-?>
-<!DOCTYPE html>
-<html lang="en">
+$register_data = [
+    'required' => ['email', 'password', 'name'],
+    'errors' => []
+];
 
-<head>
-    <meta charset="UTF-8">
-    <title>Дела в Порядке!</title>
-    <link rel="stylesheet" href="css/normalize.css">
-    <link rel="stylesheet" href="css/style.css">
-</head>
+$new_project_data = [
+    'required' => ['name'],
+    'errors' => []
+];
 
-<body><!--class="overlay"-->
-<h1 class="visually-hidden">Дела в порядке</h1>
+$new_task_data = [
+    'required' => ['name', 'project', 'date'],
+    'errors' => [],
+    'projects' => []
+];
 
-<div class="page-wrapper">
-    <div class="container container--with-sidebar">
-        <header class="main-header">
-            <a href="#">
-                <img src="img/logo.png" width="153" height="42" alt="Логитип Дела в порядке">
-            </a>
+$login_data = [
+    'required' => ['email', 'password'],
+    'errors' => []
+];
 
-            <div class="main-header__side">
-                <a class="main-header__side-item button button--plus" href="#">Добавить задачу</a>
+$layout_data = [
+    'title' => 'Дела в Порядке!',
+    'body-background' => false,
+    'page-header' => true,
+    'sidebar' => false,
+    'user' => false,
+    'projects' => [],
+    'active_project' => 0,
+    'content' => '',
+    'modal' => false
+];
 
-                <div class="main-header__side-item user-menu">
-                    <div class="user-menu__image">
-                        <img src="img/user-pic.jpg" width="40" height="40" alt="Пользователь">
-                    </div>
+if (($_SERVER['REQUEST_METHOD'] === 'POST') && !empty($_POST)) {
 
-                    <div class="user-menu__data">
-                        <p>Константин</p>
+    if (isset($_POST['new-project']) && isset($_SESSION['user']['id'])) {
+        $new_project_data['errors'] = check_required_fields($_POST, $new_project_data['required']);
 
-                        <a href="#">Выйти</a>
-                    </div>
-                </div>
-            </div>
-        </header>
+        if (get_project($connect, $_SESSION['user']['id'], $_POST['name'])) {
+            $new_project_data['errors']['name'] = 'Такой проект уже существует';
+        }
 
-        <div class="content">
-            <section class="content__side">
-                <h2 class="content__side-heading">Проекты</h2>
+        if (!count($new_project_data['errors'])) {
+            $new_project = [
+                'name' => $_POST['name'],
+                'user_id' => $_SESSION['user']['id']
+            ];
 
-                <nav class="main-navigation">
-                    <ul class="main-navigation__list">
-                        <li class="main-navigation__list-item">
-                            <a class="main-navigation__list-item-link" href="#">Входящие</a>
-                            <span class="main-navigation__list-item-count">24</span>
-                        </li>
+            insert_data($connect, 'projects', $new_project);
+            header('Location: /index.php');
+        }
+    }
 
-                        <li class="main-navigation__list-item main-navigation__list-item--active">
-                            <a class="main-navigation__list-item-link" href="#">Учеба</a>
-                            <span class="main-navigation__list-item-count">12</span>
-                        </li>
+    if (isset($_POST['new-task']) && isset($_SESSION['user']['id'])) {
+        $new_task_data['errors'] = check_required_fields($_POST, $new_task_data['required']);
 
-                        <li class="main-navigation__list-item">
-                            <a class="main-navigation__list-item-link" href="#">Здоровье</a>
-                            <span class="main-navigation__list-item-count">3</span>
-                        </li>
+        if ($_POST['project'] && !get_project_by_id($connect, $_POST['project'])) {
+            $new_task_data['errors']['project'] = 'Проект не существует';
+        }
 
-                        <li class="main-navigation__list-item">
-                            <a class="main-navigation__list-item-link" href="#">Домашние дела</a>
-                            <span class="main-navigation__list-item-count">7</span>
-                        </li>
+        $new_task_deadline = strtotime(convert_human_date($_POST['date']));
+        if (!$new_task_deadline) {
+            $new_task_data['errors']['date'] = 'Неверный формат даты';
+        } elseif ($new_task_deadline < strtotime(date('d.m.Y'))) {
+            $new_task_data['errors']['date'] = 'Дата должна быть больше либо равна текущей датe';
+        }
 
-                        <li class="main-navigation__list-item">
-                            <a class="main-navigation__list-item-link" href="#">Авто</a>
-                            <span class="main-navigation__list-item-count">0</span>
-                        </li>
-                    </ul>
-                </nav>
+        if (!count($new_task_data['errors'])) {
+            $new_task = [
+                'created' => date('Y-m-d H:i'),
+                'name' => $_POST['name'],
+                'file_name' => null,
+                'deadline' => date('Y-m-d H:i', $new_task_deadline),
+                'project_id' => (int)$_POST['project'],
+                'user_id' => $_SESSION['user']['id']
+            ];
 
-                <a class="button button--transparent button--plus content__side-button" href="#">Добавить проект</a>
-            </section>
+            if (isset($_FILES['preview'])) {
+                $file_path = __DIR__ . '\\';
+                $file_name = $_FILES['preview']['name'];
+                $file_tmp_name = $_FILES['preview']['tmp_name'];
+                move_uploaded_file($file_tmp_name, $file_path . $file_name);
+                $new_task['file_name'] = $file_name;
+            }
 
-            <main class="content__main">
-                <h2 class="content__main-heading">Список задач</h2>
+            insert_data($connect, 'tasks', $new_task);
+            header('Location: /index.php');
+        }
+    }
 
-                <form class="search-form" action="index.php" method="post">
-                    <input class="search-form__input" type="text" name="" value="" placeholder="Поиск по задачам">
+    if (isset($_POST['register'])) {
+        $register_data['errors'] = check_required_fields($_POST, $register_data['required']);
 
-                    <input class="search-form__submit" type="submit" name="" value="Искать">
-                </form>
+        if (!validate_email($_POST['email'])) {
+            $register_data['errors']['email'] = 'E-mail введён некорректно';
+        } else {
+            if (select_data($connect, 'SELECT * FROM users WHERE email = ?', [$_POST['email']])) {
+                $register_data['errors']['email'] = 'E-mail уже зарегистрирован';
+            }
+        }
 
-                <div class="tasks-controls">
-                    <div class="radio-button-group">
-                        <label class="radio-button">
-                            <input class="radio-button__input visually-hidden" type="radio" name="radio" checked="">
-                            <span class="radio-button__text">Все задачи</span>
-                        </label>
+        if (!count($register_data['errors'])) {
+            $new_user = [
+                'registration' => date('Y-m-d'),
+                'email' => $_POST['email'],
+                'name' => $_POST['name'],
+                'password' => password_hash($_POST['password'], PASSWORD_DEFAULT)
+            ];
+            insert_data($connect, 'users', $new_user);
+            $_SESSION['register_complete'] = true;
+            header('Location: /index.php?login');
+        }
+    }
 
-                        <label class="radio-button">
-                            <input class="radio-button__input visually-hidden" type="radio" name="radio">
-                            <span class="radio-button__text">Повестка дня</span>
-                        </label>
+    if (isset($_POST['login'])) {
+        $login_data['errors'] = check_required_fields($_POST, $login_data['required']);
 
-                        <label class="radio-button">
-                            <input class="radio-button__input visually-hidden" type="radio" name="radio">
-                            <span class="radio-button__text">Завтра</span>
-                        </label>
+        if (!validate_email($_POST['email'])) {
+            $login_data['errors']['email'] = 'E-mail введён некорректно';
+        }
 
-                        <label class="radio-button">
-                            <input class="radio-button__input visually-hidden" type="radio" name="radio">
-                            <span class="radio-button__text">Просроченные</span>
-                        </label>
-                    </div>
+        if (!count($login_data['errors'])) {
+            $email = $_POST['email'];
+            $password = $_POST['password'];
+            $user = current(select_data($connect, 'SELECT * FROM users WHERE email = ?', [$email]));
 
-                    <label class="checkbox">
-                        <!--добавить сюда аттрибут "checked", если переменная $show_complete_tasks равна единице-->
-                        <input id="show-complete-tasks" class="checkbox__input visually-hidden" type="checkbox"<?= $show_complete_tasks ? "checked" : ""?>>
-                        <span class="checkbox__text">Показывать выполненные</span>
-                    </label>
-                </div>
+            if ($user && password_verify($password, $user['password'])) {
+                $_SESSION['user'] = $user;
+                header('Location: /index.php');
+            } else {
+                $login_data['errors']['message'] = 'Вы ввели неверный email/пароль';
+            }
+        } else {
+            $login_data['errors']['message'] = 'Пожалуйста, исправьте ошибки в форме';
+        }
+    }
+}
 
-                <table class="tasks">
+if (isset($_SESSION['user']['id'])) {
+    $projects = get_list_projects($connect, $_SESSION['user']['id']);
 
-                    <!--показывать следующий тег <tr/>, если переменная равна единице-->
-                    <? if ($show_complete_tasks):?>
-                    <tr class="tasks__item task task--completed">
-                        <td class="task__select">
-                            <label class="checkbox task__checkbox">
-                                <input class="checkbox__input visually-hidden" type="checkbox" checked>
-                                <span class="checkbox__text">Записаться на интенсив "Базовый PHP"</span>
-                            </label>
-                        </td>
-                        <td class="task__date">10.04.2017</td>
+    $search = $_GET['search'] ?? '';
+    $project = $_GET['project'] ?? 0;
+    $deadline = $_GET['deadline'] ?? 0;
 
-                        <td class="task__controls">
-                        </td>
-                    </tr>
-                    <?endif;?>
-                    <tr class="tasks__item task">
-                        <td class="task__select">
-                            <label class="checkbox task__checkbox">
-                                <input class="checkbox__input visually-hidden" type="checkbox">
-                                <span class="checkbox__text">Выполнить первое задание</span>
-                            </label>
-                        </td>
+    if (in_array($project, array_column($projects, 'id'))) {
+        $sql = 'SELECT *, DATE_FORMAT(deadline, "%d.%m.%Y") AS deadline_format FROM tasks WHERE user_id = ?';
+        $sql_params[] = $_SESSION['user']['id'];
 
-                        <td class="task__date">
-                            <!--выведите здесь дату выполнения задачи-->
-                        </td>
+        if ($project) {
+            $sql .= ' AND project_id = ?';
+            $sql_params[] = $project;
+        }
 
-                        <td class="task__controls">
-                            <button class="expand-control" type="button" name="button">Выполнить первое задание</button>
+        $search = trim($search);
+        if ($search) {
+            $sql .= ' AND name LIKE ?';
+            $sql_params[] = '%' . $search . '%';
+        }
 
-                            <ul class="expand-list hidden">
-                                <li class="expand-list__item">
-                                    <a href="#">Выполнить</a>
-                                </li>
+        switch ($deadline) {
+            case 1:
+                $sql .= ' AND DATE(deadline) = CURDATE()';
+                break;
+            case 2:
+                $sql .= ' AND DATE(deadline) = CURDATE() + INTERVAL 1 DAY';
+                break;
+            case 3:
+                $sql .= ' AND completed IS NULL AND DATE(deadline) < CURDATE()';
+                break;
+        }
 
-                                <li class="expand-list__item">
-                                    <a href="#">Удалить</a>
-                                </li>
-                            </ul>
-                        </td>
-                    </tr>
+        $content_data['search'] = $search;
+        $content_data['active_project'] = (int)$project;
+        $content_data['deadline'] = (int)$deadline;
+        $content_data['tasks'] = select_data($connect, $sql, $sql_params);
+    } else {
+        http_response_code(404);
+    }
 
+    if (isset($_GET['show_completed'])) {
+        setcookie('show_completed', $_GET['show_completed'], strtotime('+3 days'), '/');
+        header('Location: /index.php');
+    }
+    if (isset($_COOKIE['show_completed']) && ($_COOKIE['show_completed'] === '1')) {
+        $content_data['show_complete_tasks'] = true;
+    }
 
-                </table>
-            </main>
-        </div>
-    </div>
-</div>
+    $layout_data['sidebar'] = true;
+    $layout_data['user'] = $_SESSION['user'];
+    $layout_data['projects'] = $projects;
+    $layout_data['active_project'] = (int)$project;
+    $layout_data['content'] = render_template('templates/index.php', $content_data);
 
-<footer class="main-footer">
-    <div class="container">
-        <div class="main-footer__copyright">
-            <p>© 2017, «Дела в порядке»</p>
+    if (isset($_GET['new_project']) || count($new_project_data['errors'])) {
+        $layout_data['modal'] = render_template('templates/new-project.php', $new_project_data);
+    }
 
-            <p>Веб-приложение для удобного ведения списка дел.</p>
-        </div>
+    if (isset($_GET['add']) || count($new_task_data['errors'])) {
+        array_shift($projects);
+        array_unshift($projects, [
+            'id' => '',
+            'name' => '<Выберите проект>'
+        ]);
+        $new_task_data['projects'] = $projects;
+        $layout_data['modal'] = render_template('templates/new-task.php', $new_task_data);
+    }
 
-        <a class="main-footer__button button button--plus">Добавить задачу</a>
+    if (isset($_GET['task'])) {
+        $task_id = (int)$_GET['task'];
+        $sql = '';
 
-        <div class="main-footer__social social">
-            <span class="visually-hidden">Мы в соцсетях:</span>
-            <a class="social__link social__link--facebook" href="#">Facebook
-                <svg width="27" height="27" viewBox="0 0 27 27" xmlns="http://www.w3.org/2000/svg">
-                    <circle stroke="#879296" fill="none" cx="13.5" cy="13.5" r="12.667"/>
-                    <path fill="#879296"
-                          d="M14.26 20.983h-2.816v-6.626H10.04v-2.28h1.404v-1.364c0-1.862.79-2.922 3.04-2.922h1.87v2.28h-1.17c-.876 0-.972.322-.972.916v1.14h2.212l-.245 2.28h-1.92v6.625z"/>
-                </svg>
-            </a><span class="visually-hidden">
-        ,</span>
-            <a class="social__link social__link--twitter" href="#">Twitter
-                <svg width="27" height="27" viewBox="0 0 27 27" xmlns="http://www.w3.org/2000/svg">
-                    <circle stroke="#879296" fill="none" cx="13.5" cy="13.5" r="12.687"/>
-                    <path fill="#879296"
-                          d="M18.38 10.572c.525-.336.913-.848 1.092-1.445-.485.305-1.02.52-1.58.635-.458-.525-1.12-.827-1.816-.83-1.388.063-2.473 1.226-2.44 2.615-.002.2.02.4.06.596-2.017-.144-3.87-1.16-5.076-2.78-.22.403-.335.856-.332 1.315-.01.865.403 1.68 1.104 2.188-.397-.016-.782-.13-1.123-.333-.03 1.207.78 2.272 1.95 2.567-.21.06-.43.09-.653.088-.155.015-.313.015-.47 0 .3 1.045 1.238 1.777 2.324 1.815-.864.724-1.956 1.12-3.083 1.122-.198.013-.397.013-.595 0 1.12.767 2.447 1.18 3.805 1.182 4.57 0 7.066-3.992 7.066-7.456v-.34c.49-.375.912-.835 1.24-1.357-.465.218-.963.36-1.473.42z"/>
-                </svg>
-            </a><span class="visually-hidden">
-        ,</span>
-            <a class="social__link social__link--instagram" href="#">Instagram
-                <svg width="27" height="27" viewBox="0 0 27 27" xmlns="http://www.w3.org/2000/svg">
-                    <circle stroke="#879296" fill="none" cx="13.5" cy="13.5" r="12.687"/>
-                    <path fill="#879296"
-                          d="M13.5 8.3h2.567c.403.002.803.075 1.18.213.552.213.988.65 1.2 1.2.14.38.213.778.216 1.18v5.136c-.003.403-.076.803-.215 1.18-.213.552-.65.988-1.2 1.2-.378.14-.778.213-1.18.216h-5.135c-.403-.003-.802-.076-1.18-.215-.552-.214-.988-.65-1.2-1.2-.14-.38-.212-.78-.215-1.182V13.46v-2.566c.003-.403.076-.802.214-1.18.213-.552.65-.988 1.2-1.2.38-.14.778-.212 1.18-.215H13.5m0-1.143h-2.616c-.526.01-1.048.108-1.54.292-.853.33-1.527 1-1.856 1.854-.184.493-.283 1.014-.292 1.542v5.232c.01.526.108 1.048.292 1.54.33.853 1.003 1.527 1.855 1.856.493.184 1.015.283 1.54.293H16.117c.527-.01 1.048-.11 1.54-.293.854-.33 1.527-1.003 1.856-1.855.184-.493.283-1.015.293-1.54V13.46v-2.614c-.01-.528-.11-1.05-.293-1.542-.33-.853-1.002-1.525-1.855-1.855-.493-.185-1.014-.283-1.54-.293-.665.01-.89 0-2.617 0zm0 3.093c-2.51.007-4.07 2.73-2.808 4.898 1.26 2.17 4.398 2.16 5.645-.017.285-.495.434-1.058.433-1.63-.006-1.8-1.47-3.256-3.27-3.25zm0 5.378c-1.63-.007-2.64-1.777-1.82-3.185.823-1.41 2.86-1.4 3.67.017.18.316.276.675.278 1.04.006 1.177-.95 2.133-2.128 2.128zm4.118-5.524c0 .58-.626.94-1.127.65-.5-.29-.5-1.012 0-1.3.116-.067.245-.102.378-.102.418-.005.76.333.76.752z"/>
-                </svg>
-            </a>
-            <span class="visually-hidden">,</span>
-            <a class="social__link social__link--vkontakte" href="#">Вконтакте
-                <svg width="27" height="27" viewBox="0 0 27 27" xmlns="http://www.w3.org/2000/svg">
-                    <circle stroke="#879296" fill="none" cx="13.5" cy="13.5" r="12.666"/>
-                    <path fill="#879296"
-                          d="M13.92 18.07c.142-.016.278-.074.39-.166.077-.107.118-.237.116-.37 0 0 0-1.13.516-1.296.517-.165 1.208 1.09 1.95 1.58.276.213.624.314.973.28h1.95s.973-.057.525-.837c-.38-.62-.865-1.17-1.432-1.626-1.208-1.1-1.043-.916.41-2.816.886-1.16 1.236-1.86 1.13-2.163-.108-.302-.76-.214-.76-.214h-2.164c-.092-.026-.19-.026-.282 0-.083.058-.15.135-.195.225-.224.57-.49 1.125-.8 1.656-.973 1.61-1.344 1.697-1.51 1.59-.37-.234-.272-.975-.272-1.433 0-1.56.243-2.202-.468-2.377-.32-.075-.647-.108-.974-.098-.604-.052-1.213.01-1.793.186-.243.116-.438.38-.32.4.245.018.474.13.642.31.152.303.225.638.214.975 0 0 .127 1.832-.302 2.056-.43.223-.692-.167-1.55-1.618-.29-.506-.547-1.03-.77-1.57-.038-.09-.098-.17-.174-.233-.1-.065-.214-.108-.332-.128H6.485s-.312 0-.42.137c-.106.135 0 .36 0 .36.87 2 2.022 3.868 3.42 5.543.923.996 2.21 1.573 3.567 1.598z"/>
-                </svg>
-            </a>
-        </div>
+        if (isset($_GET['complete'])) {
+            $sql = 'UPDATE tasks SET completed = ';
+            $sql .= ($_GET['complete']) ?  'CURRENT_TIMESTAMP()' : 'NULL';
+            $sql .= ' WHERE id = ?';
+        }
 
-        <div class="main-footer__developed-by">
-            <span class="visually-hidden">Разработано:</span>
+        if (isset($_GET['delete'])) {
+            $sql = 'DELETE FROM tasks WHERE id = ?';
+        }
 
-            <a href="https://htmlacademy.ru/intensive/php">
-                <img src="img/htmlacademy.svg" alt="HTML Academy" width="118" height="40">
-            </a>
-        </div>
-    </div>
-</footer>
+        if ($sql && exec_query($connect, $sql, [$task_id])) {
+            header('Location: /index.php');
+        }
+    }
+} else {
+    $layout_data['body-background'] = true;
+    $layout_data['content'] = render_template('templates/guest.php');
 
-<div class="modal" hidden>
-    <button class="modal__close" type="button" name="button">Закрыть</button>
+    if (isset($_GET['register']) || count($register_data['errors'])) {
+        $layout_data['body-background'] = false;
+        $layout_data['page-header'] = false;
+        $layout_data['sidebar'] = true;
+        $layout_data['content'] = render_template('templates/register.php', $register_data);
+    }
 
-    <h2 class="modal__heading">Добавление задачи</h2>
+    if (isset($_GET['login']) || count($login_data['errors'])) {
+        if (isset($_SESSION['register_complete'])) {
+            $login_data['errors']['message'] = 'Теперь вы можете войти, используя свой email и пароль';
+            unset($_SESSION['register_complete']);
+        }
+        $layout_data['modal'] = render_template('templates/login.php', $login_data);
+    }
+}
 
-    <form class="form" class="" action="index.html" method="post">
-        <div class="form__row">
-            <label class="form__label" for="name">Название <sup>*</sup></label>
+$layout = render_template('templates/layout.php', $layout_data);
 
-            <input class="form__input" type="text" name="name" id="name" value="" placeholder="Введите название">
-        </div>
-
-        <div class="form__row">
-            <label class="form__label" for="project">Проект <sup>*</sup></label>
-
-            <select class="form__input form__input--select" name="project" id="project">
-                <option value="">Входящие</option>
-            </select>
-        </div>
-
-        <div class="form__row">
-            <label class="form__label" for="date">Дата выполнения <sup>*</sup></label>
-
-            <input class="form__input form__input--date" type="text" name="date" id="date" value=""
-                   placeholder="Введите дату в формате ДД.ММ.ГГГГ">
-        </div>
-
-        <div class="form__row">
-            <label class="form__label" for="file">Файл</label>
-
-            <div class="form__input-file">
-                <input class="visually-hidden" type="file" name="preview" id="preview" value="">
-
-                <label class="button button--transparent" for="preview">
-                    <span>Выберите файл</span>
-                </label>
-            </div>
-        </div>
-
-        <div class="form__row form__row--controls">
-            <input class="button" type="submit" name="" value="Добавить">
-        </div>
-    </form>
-</div>
-
-<script type="text/javascript" src="js/script.js"></script>
-</body>
-</html>
+print($layout);
