@@ -1,8 +1,9 @@
 {
     "name": "htmlacademy/doingsdone",
     "description": "Личный проект «Дела в Порядке» от HTML Academy",
+    "type": "project",
     "require": {
-        "composer/composer": "^1.5"
+        "swiftmailer/swiftmailer": "@stable"
     },
     "authors": [
         {

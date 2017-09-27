@@ -22,12 +22,14 @@ $email = $_POST['email'] ?? '';
         </div>
         <div class="form__row">
             <label class="checkbox">
-                <input class="checkbox__input visually-hidden" type="checkbox" checked>
-                <span class="checkbox__text">Запомнить меня</span>
+              <input class="checkbox__input visually-hidden" type="checkbox" checked>
+              <span class="checkbox__text">Запомнить меня</span>
             </label>
         </div>
         <div class="form__row form__row--controls">
-            <p class="error-massage"><?= $data['errors']['message']; ?></p>
+            <?php if (count($data['errors'])): ?>
+                <p class="error-massage"><?= $data['errors']['message']; ?></p>
+            <?php endif; ?>
             <input class="button" type="submit" name="login" value="Войти">
         </div>
     </form>

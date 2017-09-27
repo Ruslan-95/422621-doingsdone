@@ -1,5 +1,7 @@
 <?php
-$name = $_POST['name'] ?? ''; ?>
+$name = $_POST['name'] ?? '';
+?>
+
 <div class="modal">
     <button class="modal__close" type="button" name="button">Закрыть</button>
     <h2 class="modal__heading">Новый проект</h2>
